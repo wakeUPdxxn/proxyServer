@@ -1,0 +1,6 @@
+set(-DCMAKE_TOOLCHAIN_FILE="C:/Work/libs/vcpkg/scripts/buildsystems/vcpkg.cmake")
+find_package(Protobuf REQUIRED)
+include_directories(${PROTOBUF_INCLUDE_DIR})
+PROTOBUF_GENERATE_CPP(PROTO_SRC PROTO_HEADER messages.proto)
+add_library(proto_msg ${PROTO_HEADER} ${PROTO_SRC})
+target_link_libraries(proto_msg PUBLIC ${PROTOBUF_LIBRARIES})
