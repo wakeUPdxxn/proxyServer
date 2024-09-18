@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string>
-#include </Work/repos/proxyServer/out/build/x64-Debug/proto/messages.pb.h> //temp include (default = messages.pb.h
 #include <boost/asio.hpp>
 
 namespace ServerSide {

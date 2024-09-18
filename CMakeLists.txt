@@ -15,8 +15,6 @@ IF (Boost_FOUND)
     ADD_DEFINITIONS( "-DHAS_BOOST" )
 ENDIF()
 
-add_subdirectory(proto)
-include_directories(proto)
 
 add_executable(proxyServer server.cpp main.cpp server.hpp)
-target_link_libraries (proxyServer proto_msg ${CPP_SHARED_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries (proxyServer ${Boost_LIBRARIES})
