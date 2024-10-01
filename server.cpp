@@ -1,32 +1,39 @@
 #include "server.hpp"
 
+namespace bpt = boost::property_tree;
 using namespace ServerSide;
 
-Server::Server(unsigned short port) : _port(port) {}
+Server::Server(unsigned short port) :_port(port) {}
 
 Server::~Server(){
     _a.close();
     _io_svc.stop();
 }
 
-void ServerSide::Server::start(){
+void Server::start(){
     _a.listen();
     acceptConnection();
     _io_svc.run();
 }
 
-
-
-void Server::acceptConnection() {
-    _a.async_accept(_sock, [this](err_c ec) {
+void ServerSide::Server::acceptConnection() {
+    _a.async_accept(_socket, [this](err_c ec) {
         if (!ec) {
-            std::make_shared<MessageHandler>(std::move(_sock))->handle();
-            acceptConnection();
+            try {
+                std::make_shared<ClientSocketHandler>(boost::move(_socket), getReqHandler())->handle();
+                acceptConnection();
+            }
+            catch (std::exception& e) {
+                std::cout << e.what();
+            }
         }
         });
 }
 
-void ServerSide::Server::MessageHandler::parseMessage(std::istream& request){
-    //Messages::BrowserData::ParseFromIstream(request);
-    std::cout << request.rdbuf();
+RequestHandler ServerSide::Server::getReqHandler(){
+    std::function<void(istream& in)> handler = [&](istream& in) {
+        _parser.requestHandler(in);
+    };
+    return handler;
 }
+
