@@ -31,8 +31,8 @@ void ServerSide::Server::acceptConnection() {
 }
 
 RequestHandler ServerSide::Server::getReqHandler(){
-    std::function<void(istream& in)> handler = [&](istream& in) {
-        _parser.requestHandler(in);
+    std::function<void(string& request)> handler = [&](std::string& request) {
+        _parser.requestHandler(request);
     };
     return handler;
 }
