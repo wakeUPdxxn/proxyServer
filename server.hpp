@@ -13,7 +13,7 @@ namespace ba = boost::asio;
 using ba::ip::tcp;
 using err_c = boost::system::error_code;
 
-using RequestHandler = std::function<void(std::istream& in)>;
+using RequestHandler = std::function<void(std::string& request)>;
 
 namespace ServerSide {
 
@@ -32,19 +32,16 @@ namespace ServerSide {
 			while (true) {
 				std::unique_lock<std::mutex>rdLock(mt);
 				cv.wait(rdLock, [this] {return dataReady; });
-				parseMessage(requests.front().data); 
+				parseMessage(requests.front()->reqData); 
 				if (dataReady = true) {
 					dataReady = false;
 				}
 				cv.notify_one();
 			}
 		}
-		void requestHandler(std::istream& in) {
-			Request request;
-			request.data.assign(std::istream_iterator<char>(in), {});
-
+		void requestHandler(std::string& request) {
 			std::unique_lock<std::mutex>locker(mt);
-			requests.push(request);		
+			requests.push(new Request(request));
 			dataReady = true;
 			cv.notify_one();
 		}
@@ -56,15 +53,15 @@ namespace ServerSide {
 		std::vector<std::thread>threadPool;
 
 		struct Request {
-			std::vector<char>data{};
+			explicit Request(std::string &request):reqData(move(request)) {};
+			std::string reqData;
 		};
 
-		std::queue<Request>requests;
+		std::queue<Request*>requests;
 
-		void parseMessage(vector<char>& msg) {
-			for (auto n : msg) {
-				std::cout << n;
-			}
+		void parseMessage(std::string& msg) {
+			std::cout << msg;
+			delete requests.front();
 			requests.pop();
 		}
 	};
@@ -76,32 +73,10 @@ namespace ServerSide {
 		void start();
 
 	private:
-		struct ClientSocketHandler : std::enable_shared_from_this<ClientSocketHandler> {
-			ClientSocketHandler(tcp::socket&& sock,RequestHandler handler) :_sock(boost::move(sock)),_reqHandler(handler) {}
-			void handle() {
-				auto self = shared_from_this();//for increase live time of current obj created as shr ptr in Server Class method
-				ba::async_read(_sock,_buffer, [self, this](err_c ec, size_t bytes) {
-					if (ec == boost::asio::error::connection_reset)
-					{
-						_sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-						return;
-					}
-					else if (!ec || ec == boost::asio::error::eof) {
-						std::istream in(&_buffer);
-						_reqHandler(in);
-						handle();
-					}
-					else {
-						std::cout << ec.what();
-					}
-					});
-			}
-		private:
-			tcp::socket _sock;
-			ba::streambuf _buffer;
-			RequestHandler _reqHandler;
-		};
+		void acceptConnection();
+		RequestHandler getReqHandler();
 
+	private:
 		unsigned short _port{ 2323 };
 
 		Parser _parser{};
@@ -109,10 +84,34 @@ namespace ServerSide {
 		tcp::socket _socket{ _io_svc };
 		tcp::acceptor _a{ _io_svc,boost::asio::ip::tcp::endpoint {{},_port} };
 
-	private:
-		void acceptConnection();
-		RequestHandler getReqHandler();
+		struct ClientSocketHandler : std::enable_shared_from_this<ClientSocketHandler> {
+		public:
+			ClientSocketHandler(tcp::socket&& sock, RequestHandler handler) :_sock(boost::move(sock)), _reqHandler(handler) {}
+			~ClientSocketHandler() = default;
 
+			void handle() {
+				auto self = shared_from_this();//for increase live time of current obj created as shr ptr in Server Class method
+				_sock.async_read_some(ba::buffer(data), [self, this](boost::system::error_code ec, size_t byt) {
+					if (ec == boost::asio::error::connection_reset)
+					{
+						_sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+						return;
+					}
+					else if (!ec) {
+						copy(data.begin(), data.end(), back_inserter(request));
+						handle();
+					}
+					if (ec == ba::error::eof) {
+						_reqHandler(request);
+					}
+					});
+			}
+		private:
+			std::array<char, 1024> data;
+			tcp::socket _sock;
+			std::string request;
+			RequestHandler _reqHandler;
+		};
 	};
 };
 
