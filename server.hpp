@@ -3,8 +3,7 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/move/move.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+#include <boost/json.hpp>
 #include <queue>
 #include <condition_variable>
 
@@ -13,7 +12,8 @@ namespace ba = boost::asio;
 using ba::ip::tcp;
 using err_c = boost::system::error_code;
 
-using RequestHandler = std::function<void(std::string& request)>;
+
+using RequestHandler = std::function<void(const std::string &request)>;
 
 namespace ServerSide {
 
@@ -39,9 +39,9 @@ namespace ServerSide {
 				cv.notify_one();
 			}
 		}
-		void requestHandler(std::string& request) {
+		void requestHandler(const std::string &request) {
 			std::unique_lock<std::mutex>locker(mt);
-			requests.push(new Request(request));
+			requests.push(new Request(std::move(const_cast<std::string&>(request))));
 			dataReady = true;
 			cv.notify_one();
 		}
@@ -53,14 +53,23 @@ namespace ServerSide {
 		std::vector<std::thread>threadPool;
 
 		struct Request {
-			explicit Request(std::string &request):reqData(move(request)) {};
+			explicit Request(std::string &&request):reqData(std::forward<std::string>(request)) {};
 			std::string reqData;
 		};
 
 		std::queue<Request*>requests;
 
 		void parseMessage(std::string& msg) {
-			std::cout << msg;
+			try {
+				boost::json::object jObj = boost::json::parse(msg).as_object();
+				std::cout << jObj.at("targetId").as_string();
+			}
+			catch (boost::system::system_error::exception& msg) {
+				std::cout << msg.what();
+			}
+			//std::cout << tree.find("targetId").base().get_node()->value().second.data();
+			//std::cout << msg << "\n";
+			//std::cout << "SYZE: " << msg.size();
 			delete requests.front();
 			requests.pop();
 		}
@@ -89,27 +98,38 @@ namespace ServerSide {
 			ClientSocketHandler(tcp::socket&& sock, RequestHandler handler) :_sock(boost::move(sock)), _reqHandler(handler) {}
 			~ClientSocketHandler() = default;
 
-			void handle() {
+			void handle()  {
 				auto self = shared_from_this();//for increase live time of current obj created as shr ptr in Server Class method
-				_sock.async_read_some(ba::buffer(data), [self, this](boost::system::error_code ec, size_t byt) {
+				_sock.async_read_some(ba::buffer(_buffer), [self, this](boost::system::error_code ec, size_t bytesTransfered) {
 					if (ec == boost::asio::error::connection_reset)
 					{
 						_sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 						return;
 					}
 					else if (!ec) {
-						copy(data.begin(), data.end(), back_inserter(request));
+						totalBytesTransfered += bytesTransfered;
+						request.reserve(totalBytesTransfered);
+						copy(_buffer.begin(), _buffer.begin()+ bytesTransfered, back_inserter(request));
+
+						_buffer.fill(0);
+
 						handle();
 					}
-					if (ec == ba::error::eof) {
+					if (bytesTransfered < 1024) {
+						request.shrink_to_fit();
+						std::cout << request.size() << endl;
+						std::cout << totalBytesTransfered << endl;
 						_reqHandler(request);
 					}
 					});
 			}
 		private:
-			std::array<char, 1024> data;
 			tcp::socket _sock;
-			std::string request;
+			size_t totalBytesTransfered{0};
+			array<char, 1024> _buffer;
+			std::string request{" "};
+
+		private:
 			RequestHandler _reqHandler;
 		};
 	};
