@@ -1,6 +1,5 @@
 #include "server.hpp"
 
-namespace bpt = boost::property_tree;
 using namespace ServerSide;
 
 Server::Server(unsigned short port) :_port(port) {}
@@ -31,7 +30,7 @@ void ServerSide::Server::acceptConnection() {
 }
 
 RequestHandler ServerSide::Server::getReqHandler(){
-    std::function<void(string& request)> handler = [&](std::string& request) {
+    std::function<void(const string &request)> handler = [&](const std::string &request) {
         _parser.requestHandler(request);
     };
     return handler;
