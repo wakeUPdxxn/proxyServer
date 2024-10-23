@@ -67,9 +67,6 @@ namespace ServerSide {
 			catch (boost::system::system_error::exception& msg) {
 				std::cout << msg.what();
 			}
-			//std::cout << tree.find("targetId").base().get_node()->value().second.data();
-			//std::cout << msg << "\n";
-			//std::cout << "SYZE: " << msg.size();
 			delete requests.front();
 			requests.pop();
 		}
@@ -117,8 +114,6 @@ namespace ServerSide {
 					}
 					if (bytesTransfered < 1024) {
 						request.shrink_to_fit();
-						std::cout << request.size() << endl;
-						std::cout << totalBytesTransfered << endl;
 						_reqHandler(request);
 					}
 					});
