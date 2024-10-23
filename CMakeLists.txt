@@ -8,7 +8,10 @@ set(-DCMAKE_TOOLCHAIN_FILE="C:/Work/libs/vcpkg/scripts/buildsystems/vcpkg.cmake"
 set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 set(Boost_USE_MULTITHREADED ON)
 
-find_package(Boost REQUIRED)
+find_package(Boost COMPONENTS json REQUIRED )
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+endif()
 
 IF (Boost_FOUND)
     INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
@@ -17,4 +20,4 @@ ENDIF()
 
 
 add_executable(proxyServer server.cpp main.cpp server.hpp)
-target_link_libraries (proxyServer ${Boost_LIBRARIES})
+target_link_libraries (proxyServer LINK_PUBLIC ${Boost_LIBRARIES})
