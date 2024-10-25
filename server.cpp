@@ -2,8 +2,6 @@
 
 using namespace ServerSide;
 
-Server::Server(unsigned short port) :_port(port) {}
-
 Server::~Server(){
     _a.close();
     _io_svc.stop();
