@@ -13,11 +13,5 @@ if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
-IF (Boost_FOUND)
-    INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
-    ADD_DEFINITIONS( "-DHAS_BOOST" )
-ENDIF()
-
-
 add_executable(proxyServer server.cpp main.cpp server.hpp)
 target_link_libraries (proxyServer LINK_PUBLIC ${Boost_LIBRARIES})
