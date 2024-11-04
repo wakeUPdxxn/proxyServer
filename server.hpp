@@ -4,18 +4,16 @@
 #include <boost/bind.hpp>
 #include <boost/move/move.hpp>
 #include <boost/json.hpp>
+#include <boost/interprocess/ipc/message_queue.hpp>
 #include <queue>
 #include <condition_variable>
 
-using namespace std;
-namespace ba = boost::asio;
-using ba::ip::tcp;
-using err_c = boost::system::error_code;
-
-
-using RequestHandler = std::function<void(const std::string &request)>;
-
 namespace ServerSide {
+	namespace ba = boost::asio;
+	using ba::ip::tcp;
+	using err_c = boost::system::error_code;
+
+	using RequestHandler = std::function<void(const std::string& request)>;
 
 	class Parser {
 	public:
@@ -28,10 +26,12 @@ namespace ServerSide {
 				}
 			}
 		}
-		~Parser() = default;
+		~Parser() {
+			stop_flag = true;
+		}
 
 		void worker() {
-			while (true) {		
+			while (!stop_flag) {		
 				std::unique_lock<std::mutex>rdLock(mt);
 				cv.wait(rdLock, [this] {return dataReady; });
 
@@ -46,7 +46,7 @@ namespace ServerSide {
 		}
 		void requestHandler(const std::string &request) {
 			std::lock_guard<std::mutex>locker(mt);
-			requests.emplace(std::move(std::make_unique<Request>(std::move(const_cast<std::string&>(request)))));
+			requests.emplace(std::make_unique<Request>(std::move(const_cast<std::string&>(request))));
 			dataReady = true;
 			cv.notify_one();
 		}
@@ -56,6 +56,7 @@ namespace ServerSide {
 		bool dataReady = false;
 
 		std::vector<std::thread>threadPool;
+		std::atomic_bool stop_flag = ATOMIC_VAR_INIT(false);
 
 		struct Request {
 			explicit Request(std::string &&request):reqData(std::forward<std::string>(request)) {};
@@ -103,9 +104,10 @@ namespace ServerSide {
 			void handle()  {
 				auto self = shared_from_this();//for increase live time of current obj created as shared ptr in Server Class method
 				_sock.async_read_some(ba::buffer(_buffer), [self, this](boost::system::error_code ec, size_t bytesTransfered) {
-					if (ec == boost::asio::error::connection_reset)
+					if (ec == boost::asio::error::connection_reset || ec==boost::asio::error::eof)
 					{
 						_sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+						_sock.close();
 						return;
 					}
 					else if (!ec) {
@@ -118,19 +120,18 @@ namespace ServerSide {
 						handle(); //call it again and waiting for new tcp package 
 					}
 					if (bytesTransfered < 1024) { //when all the data arrived
-						request.shrink_to_fit();
+						request.shrink_to_fit(); //cut all trash bytes
 						_reqHandler(request);
-
+						
 						_buffer.fill(0);         //clear buffer
 						totalBytesTransfered = 0; //set income bytes counter to deffault 
-
 					}
 					});
 			}
 		private:
 			tcp::socket _sock;
 			size_t totalBytesTransfered{0};
-			array<char, 1024> _buffer;
+			std::array<char, 1024> _buffer;
 			std::string request{""};
 
 		private:
@@ -140,5 +141,104 @@ namespace ServerSide {
 };
 
 namespace InterProcess {
+	namespace bipc = boost::interprocess;
 
+	struct Data {             //Data storage for sending to another proccess
+		Data(){}
+		Data(Data &&other) noexcept {
+			_targetId.clear();
+			memset(&_targetInfo, 0, sizeof(targetInfo));
+			memset(&_browserData, 0, sizeof(BrowserData));
+
+			_targetId = other._targetId;
+			_targetInfo= other._targetInfo;
+			_browserData = other._browserData;
+
+			memset(&other, 0, sizeof(Data));
+		}
+		std::string _targetId;
+
+		struct targetInfo {
+			std::string os;
+			std::string resolution;
+			std::string hostName;
+		}_targetInfo;
+
+		struct BrowserData {
+			std::string browserName;
+			std::vector<std::tuple<std::string, std::string, std::string>>resources;
+		}_browserData;
+	};
+
+	class IPCworkDispatcher {
+	protected:
+		IPCworkDispatcher() {}
+	public:
+		static std::shared_ptr<IPCworkDispatcher> getInstance() {
+			struct make_shared_enabler : public IPCworkDispatcher {};
+			static std::shared_ptr<IPCworkDispatcher>_disp = std::make_shared<make_shared_enabler>();
+			return _disp;
+		}
+		void setCallback(std::function<void(const Data&)>fun) {
+			callback = fun;
+		}
+		void start(){
+			if (worker != nullptr) {
+				return;
+			}
+			worker = new std::thread(std::bind(&IPCworkDispatcher::workHandler, this));
+			worker->detach();
+		}
+		void stop(){
+			stop_flag.store(true, std::memory_order_relaxed);
+		}
+		void newData(Data&& data){
+			std::lock_guard<std::mutex>dataLock(dataMt);
+			dataQueue.emplace(std::move(data));
+		}
+	private:
+		void workHandler() {
+			while (!stop_flag.load(std::memory_order_relaxed)) {
+				if (!dataQueue.empty()) {
+					callback(dataQueue.front());
+					dataQueue.pop();
+				}
+			}
+		}
+	private:
+		std::thread* worker=nullptr;
+		std::atomic_bool stop_flag = ATOMIC_VAR_INIT(false);
+
+		std::mutex dataMt;
+		std::queue<Data>dataQueue;
+
+		std::function<void(const Data&)>callback;
+	};
+
+	class IPC {
+
+	public:
+		IPC() {
+			//bipc::message_queue::remove("msg_queue");
+			//msg_queue = std::make_unique<bipc::message_queue>(bipc::create_only, "msg_queue", 100, sizeof(Data));
+		}
+		~IPC() {
+			wd->stop();
+		}
+		void _init(){
+			wd = IPCworkDispatcher::getInstance();
+			wd->setCallback(std::bind(&IPC::sendData, this, std::placeholders::_1));
+			wd->start();
+		}
+		void newData(Data&& data) {
+			wd->newData(std::move(data));
+		}
+	private:
+		//std::unique_ptr<bipc::message_queue>msg_queue;
+		std::shared_ptr<IPCworkDispatcher>wd;
+	private:
+		void sendData(const Data& data) { // it will be executed in another thread from IPCworkDispatcher
+
+		}
+	};
 };
