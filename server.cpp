@@ -17,7 +17,7 @@ void ServerSide::Server::acceptConnection() {
     _a.async_accept(_socket, [this](err_c ec) {
         if (!ec) {
             try {
-                std::make_shared<ClientSocketHandler>(boost::move(_socket), getReqHandler())->handle();
+                std::make_shared<ClientSocketHandler>(boost::move(_socket), _parser.getReqHandler())->handle();
                 acceptConnection();
             }
             catch (std::exception& e) {
@@ -25,12 +25,5 @@ void ServerSide::Server::acceptConnection() {
             }
         }
         });
-}
-
-RequestHandler ServerSide::Server::getReqHandler(){
-    std::function<void(const std::string &request)> handler = [&](const std::string &request) {
-        _parser.requestHandler(request);
-    };
-    return handler;
 }
 
