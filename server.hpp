@@ -9,6 +9,12 @@
 #include <condition_variable>
 
 namespace ServerSide {
+
+	enum:uint16_t {
+		MAX_CONNECTIONS = 50,
+		PORT = 8080
+	};
+
 	namespace ba = boost::asio;
 	using ba::ip::tcp;
 	using err_c = boost::system::error_code;
@@ -89,26 +95,26 @@ namespace ServerSide {
 		RequestHandler getReqHandler();
 
 	private:
-		unsigned short _port{ 8080 };
-
 		Parser _parser{};
+
 		ba::io_service _io_svc;
 		tcp::socket _socket{ _io_svc };
-		tcp::acceptor _a{ _io_svc,boost::asio::ip::tcp::endpoint {{},_port} };
+		tcp::acceptor _a{ _io_svc,boost::asio::ip::tcp::endpoint {{},PORT} };
 
 		struct ClientSocketHandler : std::enable_shared_from_this<ClientSocketHandler> {
 		public:
 			ClientSocketHandler(tcp::socket&& sock, RequestHandler handler) :_sock(boost::move(sock)), _reqHandler(handler) {}
-			~ClientSocketHandler(){};
+			~ClientSocketHandler(){
+				_sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+				_sock.close();
+			};
 
 			void handle()  {
 				auto self = shared_from_this();//for increase live time of current obj created as shared ptr in Server Class method
 				_sock.async_read_some(ba::buffer(_buffer), [self, this](boost::system::error_code ec, size_t bytesTransfered) {
 					if (ec == boost::asio::error::connection_reset || ec==boost::asio::error::eof)
 					{
-						_sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-						_sock.close();
-						return;
+						return; //if client socket send disconnection package after this current obj will be destroyed;
 					}
 					else if (!ec) {
 						totalBytesTransfered += bytesTransfered; //counting arrived bytes
@@ -122,7 +128,7 @@ namespace ServerSide {
 					if (bytesTransfered < 1024) { //when all the data arrived
 						request.shrink_to_fit(); //cut all trash bytes
 						_reqHandler(request);
-						
+
 						_buffer.fill(0);         //clear buffer
 						totalBytesTransfered = 0; //set income bytes counter to deffault 
 					}
@@ -173,6 +179,7 @@ namespace InterProcess {
 	class IPCworkDispatcher {
 	protected:
 		IPCworkDispatcher() {}
+		~IPCworkDispatcher() {} //non-virtual coz called like non-polymorphic from _disp ptr;
 	public:
 		static std::shared_ptr<IPCworkDispatcher> getInstance() {
 			struct make_shared_enabler : public IPCworkDispatcher {};
@@ -183,14 +190,13 @@ namespace InterProcess {
 			callback = fun;
 		}
 		void start(){
-			if (worker != nullptr) {
-				return;
+			static std::thread worker(std::bind(&IPCworkDispatcher::workHandler, this)); //static for prevention of multiple workers;
+			if (worker.joinable()) {
+				worker.detach();
 			}
-			worker = new std::thread(std::bind(&IPCworkDispatcher::workHandler, this));
-			worker->detach();
 		}
 		void stop(){
-			stop_flag.store(true, std::memory_order_relaxed);
+			stop_flag=true;
 		}
 		void newData(Data&& data){
 			std::lock_guard<std::mutex>dataLock(dataMt);
@@ -198,7 +204,7 @@ namespace InterProcess {
 		}
 	private:
 		void workHandler() {
-			while (!stop_flag.load(std::memory_order_relaxed)) {
+			while (!stop_flag) {
 				if (!dataQueue.empty()) {
 					callback(dataQueue.front());
 					dataQueue.pop();
@@ -206,7 +212,6 @@ namespace InterProcess {
 			}
 		}
 	private:
-		std::thread* worker=nullptr;
 		std::atomic_bool stop_flag = ATOMIC_VAR_INIT(false);
 
 		std::mutex dataMt;
@@ -219,18 +224,18 @@ namespace InterProcess {
 
 	public:
 		IPC() {
+			wd = IPCworkDispatcher::getInstance();
 			//bipc::message_queue::remove("msg_queue");
 			//msg_queue = std::make_unique<bipc::message_queue>(bipc::create_only, "msg_queue", 100, sizeof(Data));
 		}
 		~IPC() {
 			wd->stop();
 		}
-		void _init(){
-			wd = IPCworkDispatcher::getInstance();
+		void _init(){ //make able to perform ipc operations;
 			wd->setCallback(std::bind(&IPC::sendData, this, std::placeholders::_1));
-			wd->start();
+			wd->start(); //execute worker thread
 		}
-		void newData(Data&& data) {
+		void newData(Data&& data) { //no effect before _init() call
 			wd->newData(std::move(data));
 		}
 	private:
