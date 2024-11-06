@@ -13,5 +13,5 @@ if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
-add_executable(proxyServer server.cpp main.cpp server.hpp)
+add_executable(proxyServer server.cpp main.cpp server.hpp ipc.hpp)
 target_link_libraries (proxyServer LINK_PUBLIC ${Boost_LIBRARIES})
