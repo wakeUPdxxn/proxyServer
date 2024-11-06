@@ -8,7 +8,7 @@ Server::~Server(){
 }
 
 void Server::start(){
-    _a.listen();
+    _a.listen(MAX_CONNECTIONS);
     acceptConnection();
     _io_svc.run();
 }
