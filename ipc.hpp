@@ -7,18 +7,9 @@ namespace InterProcess {
 	namespace bipc = boost::interprocess;
 
 	struct Data {             //Data storage for sending to another proccess
-		Data() {}
-		Data(Data&& other) noexcept { //move only object
-			_targetId.clear();
-			memset(&_targetInfo, 0, sizeof(targetInfo));
-			memset(&_browserData, 0, sizeof(BrowserData));
+		Data(const Data& other) = delete;              //move only object
+		Data& operator=(const Data& other) = delete;   //move only object
 
-			_targetId = other._targetId;
-			_targetInfo = other._targetInfo;
-			_browserData = other._browserData;
-
-			memset(&other, 0, sizeof(Data));
-		}
 		std::string _targetId; //required field
 
 		struct targetInfo { //all fields are required
@@ -36,7 +27,7 @@ namespace InterProcess {
 	class IPCworkDispatcher { //class that encapsulates and implements parallel message queue processing
 	protected:
 		IPCworkDispatcher() {}
-		~IPCworkDispatcher() {} //non-virtual coz called like non-polymorphic from _disp ptr;
+		virtual ~IPCworkDispatcher() {} 
 	public:
 		static std::shared_ptr<IPCworkDispatcher> getInstance() {
 			struct make_shared_enabler : public IPCworkDispatcher {};
