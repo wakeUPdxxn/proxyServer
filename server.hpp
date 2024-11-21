@@ -23,6 +23,8 @@ namespace ServerSide {
 	class Parser {
 	public:
 		Parser() {
+			ipc._init();
+
 			threadPool.emplace_back([this] {this->worker(); });
 			threadPool.emplace_back([this] {this->worker(); });
 			for (auto& t : threadPool) {
@@ -61,6 +63,8 @@ namespace ServerSide {
 			cv.notify_one();
 		}
 	private:
+		::InterProcess::IPC ipc;
+
 		std::mutex mt;
 		std::condition_variable cv;
 		bool dataReady = false;
@@ -85,7 +89,7 @@ namespace ServerSide {
 				targetInfo = jObj.at("targetInfo").as_object();
 				loginData = jObj.at("loginData").as_array();
 
-				InterProcess::Data *data = new InterProcess::Data;
+				std::unique_ptr<InterProcess::Data> data = std::make_unique<InterProcess::Data>();
 				data->_targetId = jObj.at("targetId").as_string();
 
 				data->_targetInfo.os = targetInfo.at("os").as_string();
@@ -100,6 +104,7 @@ namespace ServerSide {
 																		json::value_to<std::string>(elem.at("login")),
 																		json::value_to<std::string>(elem.at("password"))));
 				}
+				ipc.newData(std::move(data));
 			}
 			catch (boost::system::system_error::exception& msg) {
 				std::cout << msg.what();
