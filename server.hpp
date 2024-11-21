@@ -54,7 +54,9 @@ namespace ServerSide {
 		}
 		void requestHandler(const std::string &data) {
 			std::lock_guard<std::mutex>locker(mt);
+
 			requests.emplace(std::make_unique<Request>(std::move(const_cast<std::string&>(data))));
+
 			dataReady = true;
 			cv.notify_one();
 		}
@@ -107,7 +109,7 @@ namespace ServerSide {
 
 	class Server {
 	public:
-		explicit Server()=default;
+		Server()=default;
 		~Server();
 		void start();
 
