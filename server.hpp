@@ -22,7 +22,7 @@ namespace ServerSide {
 
 	class Parser {
 	public:
-		explicit Parser() {
+		Parser() {
 			threadPool.emplace_back([this] {this->worker(); });
 			threadPool.emplace_back([this] {this->worker(); });
 			for (auto& t : threadPool) {
@@ -117,7 +117,7 @@ namespace ServerSide {
 		void acceptConnection();
 
 	private:
-		Parser _parser{};
+		Parser _parser;
 
 		ba::io_service _io_svc;
 		tcp::socket _socket{ _io_svc };
