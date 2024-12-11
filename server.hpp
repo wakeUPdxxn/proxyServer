@@ -81,6 +81,8 @@ namespace ServerSide {
 
 		void parseMessage(std::string& msg) {
 
+			std::unique_ptr<InterProcess::Data> data = std::make_unique<InterProcess::Data>();
+
 			json::object jObj;
 			json::object targetInfo;
 			json::array loginData;
@@ -89,7 +91,6 @@ namespace ServerSide {
 				targetInfo = jObj.at("targetInfo").as_object();
 				loginData = jObj.at("loginData").as_array();
 
-				std::unique_ptr<InterProcess::Data> data = std::make_unique<InterProcess::Data>();
 				data->_targetId = jObj.at("targetId").as_string();
 
 				data->_targetInfo.os = targetInfo.at("os").as_string();
