@@ -82,14 +82,16 @@ namespace InterProcess {
 		void dataWaiter() {     //{spinlocked} waiting for new data and then then calls the specific callback
 			while (!stop_flag) {                
 				if (!dataQueue.empty()) {
+					std::unique_lock<std::mutex>ulk(dataMt);
+
 					currentData.reset(dataQueue.front().release()); //free memory of processed data and own's current data ptr
 					dataQueue.pop(); //drop data ptr after release
+
+					ulk.unlock();
 
 					this->write(); //write data to file
 
 					callback(currentData->_targetId); //send data's id to other process
-
-					std::lock_guard<std::mutex>dataLock(dataMt);
 				}
 			}
 		}

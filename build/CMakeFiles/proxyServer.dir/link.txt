@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\proxyServer.dir/objects.a
+C:\MinGW\bin\ar.exe qc CMakeFiles\proxyServer.dir/objects.a @CMakeFiles\proxyServer.dir\objects1
+C:\MinGW\bin\c++.exe  -g -Wall -Wl,--whole-archive CMakeFiles\proxyServer.dir/objects.a -Wl,--no-whole-archive -o proxyServer.exe -Wl,--out-implib,libproxyServer.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\proxyServer.dir\linkLibs.rsp

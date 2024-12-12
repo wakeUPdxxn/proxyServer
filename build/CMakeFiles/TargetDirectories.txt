@@ -1,0 +1,3 @@
+C:/Work/repos/proxyServer/build/CMakeFiles/proxyServer.dir
+C:/Work/repos/proxyServer/build/CMakeFiles/edit_cache.dir
+C:/Work/repos/proxyServer/build/CMakeFiles/rebuild_cache.dir
