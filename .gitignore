@@ -3,6 +3,8 @@
 #VS
 *.vs
 out
+build
+*.json
 
 # Compiled Object files
 *.slo
