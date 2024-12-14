@@ -118,7 +118,7 @@ namespace InterProcess {
 			wd = IPCworkDispatcher::getInstance();
 
 			bipc::message_queue::remove("dataReady_q");
-			msg_queue = std::make_unique<bipc::message_queue>(bipc::create_only, "dataReady_q", 100, sizeof(std::string));
+			msg_queue = std::make_unique<bipc::message_queue>(bipc::create_only, "dataReady_q",10, sizeof(std::string));
 		}
 		~IPC() = default;
 
@@ -134,7 +134,7 @@ namespace InterProcess {
 		std::shared_ptr<IPCworkDispatcher>wd;
 	private:
 		void notify(const std::string& id) { //Executs from IPCworkDispatcher thread and sends target id to another process
-			msg_queue->send(&id, id.size(),1);
+			msg_queue->send(id.data(), id.size(), 0);
 		}
 	};
 };
