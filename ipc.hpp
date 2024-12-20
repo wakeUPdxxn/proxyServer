@@ -46,7 +46,7 @@ namespace InterProcess {
 		}
 		template<typename T>
 		void buildTargetInfo(T&& os, T&& res, T&& host) { //set up all target's info 
-			up_data->_targetInfo = Data::targetInfo{
+			p_data->_targetInfo = Data::targetInfo{
 				.os = std::forward<T>(os),          //implicitly casts const char* to std::string
 				.resolution = std::forward<T>(res), //
 				.hostName = std::forward<T>(host)   //
