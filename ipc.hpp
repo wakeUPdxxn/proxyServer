@@ -54,10 +54,16 @@ namespace InterProcess {
 		}
 		template<typename T>
 		void addBrowserData(const std::optional<std::tuple<T,T,T>> &res = {},const std::optional<T> &name = {}) { //adds fields of the current BrowserData  
-			if (res.has_value()) {
+			bool hasRes = res.has_value();
+			bool hasName = name.has_value();
+
+			if (!hasRes && !hasName) {
+				throw("Incomplete parameter");
+			}
+			if (hasRes) {
 				p_browserData->resources.push_back(res.value());
 			}
-			if (name.has_value()) p_browserData->browserName = name.value();
+			if (hasName) p_browserData->browserName = name.value();
 		}
 		std::unique_ptr<Data> getDataPtr() { //returns current Data pointer
 			auto current = p_data.release();
@@ -79,7 +85,7 @@ namespace InterProcess {
 		}
 	};
 
-	class IPCworkDispatcher:private FileManager { //class that encapsulates and implements parallel message queue processing
+	class IPCworkDispatcher: private FileManager{ //class that encapsulates and implements parallel message queue processing
 	protected:                                    //private inheritance of fileManager to hide methods 
 		IPCworkDispatcher() {
 			p_worker = std::make_unique<std::thread>(std::bind(&IPCworkDispatcher::dataWaiter, this));
