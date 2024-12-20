@@ -11,11 +11,11 @@ namespace InterProcess {
 		Data(const Data& other) = delete;              //move only object
 		Data& operator=(const Data& other) = delete;   //move only object		
 
-		struct targetInfo { //all fields are required
+		struct targetInfo { //all fields are required. Creates with the data object as a single copy
 			std::string os;
 			std::string resolution;
 			std::string hostName;
-		}_targetInfo;
+		}_targetInfo; 
 
 		struct BrowserData { //all fields are required
 			std::string browserName;
