@@ -8,13 +8,20 @@ protected:
 	FileManager();
 	~FileManager();
 
-	bool openTo(const std::filesystem::path& path);
-	bool createDir(const std::filesystem::path& dir);
+	bool openTo(const std::filesystem::path&);
+	bool createDir(const std::filesystem::path&);
 	void close();
 
+	template<typename _From,typename _To>
+	auto addPath(const _From& from, const _To& to) const
+	{
+		return std::filesystem::path(from).concat("/").concat(to.c_str());
+	}
+
+	std::ostream& getCurrentFileHandler();
+
 protected:
-	std::ofstream dataFile;
-	const std::filesystem::path root = std::filesystem::current_path().root_path().concat("/targets/");
+	const std::filesystem::path root = std::filesystem::current_path().root_path().concat("/targets"); 
 
 private:
 	std::ofstream dataFile;
