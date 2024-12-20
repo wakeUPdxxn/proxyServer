@@ -115,14 +115,12 @@ namespace InterProcess {
 	private:
 		bool write() override {
 			try {
-				std::filesystem::path path(root); //user folder path
-				path.concat(currentData->_targetId); 
+				fs::path userFolder(std::move(addPath(root, currentData->_targetId))); //user folder path
 
-				createDir(path); //creating user folder with targetId as name
+				createDir(userFolder); //creating user folder with targetId as name				
+				openTo(addPath(userFolder, std::string("info.txt"))); //creating file with os info
 				
-				openTo(std::filesystem::path(path).concat("/info.txt")); //creating file with os info
-				
-				dataFile << "os:" << currentData->_targetInfo.os << "\n"
+				getCurrentFileHandler() << "os:" << currentData->_targetInfo.os << "\n"
 					<< "screen:" << currentData->_targetInfo.resolution << "\n"
 					<< "host:" << currentData->_targetInfo.hostName << "\n";
 				close();
