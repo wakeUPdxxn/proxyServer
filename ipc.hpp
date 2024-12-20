@@ -44,13 +44,9 @@ namespace InterProcess {
 		void commitBrowserData() {    //pushs browserData into the vec of browsers after done of parsing
 			p_data->browsers.push_back(getBrowsPtr());
 		}
-		template<typename T>
-		void buildTargetInfo(T&& os, T&& res, T&& host) { //set up all target's info 
-			p_data->_targetInfo = Data::targetInfo{
-				.os = std::forward<T>(os),          //implicitly casts const char* to std::string
-				.resolution = std::forward<T>(res), //
-				.hostName = std::forward<T>(host)   //
-			};
+		template<typename...T>
+		void buildTargetInfo(T&&...args) { //set up all target's info as os/resolution/host 
+			p_data->_targetInfo = { args... }; //implicitly casts const char* to std::string
 		}
 		template<typename T>
 		void addBrowserData(const std::optional<std::tuple<T,T,T>> &res = {},const std::optional<T> &name = {}) { //adds fields of the current BrowserData  
