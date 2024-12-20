@@ -40,3 +40,8 @@ bool FileManager::createDir(const std::filesystem::path& dir)
 {
 	return fs::create_directory(dir) ? true : false;
 }
+
+std::ostream& FileManager::getCurrentFileHandler()
+{
+	return dataFile;
+}
