@@ -17,5 +17,6 @@ protected:
 	const std::filesystem::path root = std::filesystem::current_path().root_path().concat("/targets/");
 
 private:
+	std::ofstream dataFile;
 	virtual bool write() = 0; //only derived class version can be called
 };
