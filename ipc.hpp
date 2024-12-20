@@ -22,9 +22,61 @@ namespace InterProcess {
 			std::vector<std::tuple<std::string, std::string, std::string>>resources; //res.name - login - pass
 		};
 
-		std::vector<std::unique_ptr<BrowserData>>browsersData;
+		std::vector<std::unique_ptr<BrowserData>>browsers; //vec with data of all browsers 
 
 		std::string _targetId; //required field
+	};
+
+	class DataBuilder {
+	public:
+		explicit DataBuilder(const std::string& id) {
+			this->resetDataP();
+			this->resetBrowsP();
+			p_data->_targetId = std::move(id); //sets up a current id
+		}
+		~DataBuilder() = default;
+
+	private:
+		std::unique_ptr<Data>p_data;
+		std::unique_ptr<Data::BrowserData>p_browserData; //a part of Data struct
+	
+	public:
+		void commitBrowserData() {    //pushs browserData into the vec of browsers after done of parsing
+			p_data->browsers.push_back(getBrowsPtr());
+		}
+		template<typename T>
+		void buildTargetInfo(T&& os, T&& res, T&& host) { //set up all target's info 
+			up_data->_targetInfo = Data::targetInfo{
+				.os = std::forward<T>(os),          //implicitly casts const char* to std::string
+				.resolution = std::forward<T>(res), //
+				.hostName = std::forward<T>(host)   //
+			};
+		}
+		template<typename T>
+		void addBrowserData(const std::optional<std::tuple<T,T,T>> &res = {},const std::optional<T> &name = {}) { //adds fields of the current BrowserData  
+			if (res.has_value()) {
+				p_browserData->resources.push_back(res.value());
+			}
+			if (name.has_value()) p_browserData->browserName = name.value();
+		}
+		std::unique_ptr<Data> getDataPtr() { //returns current Data pointer
+			auto current = p_data.release();
+			this->resetDataP();
+			return std::unique_ptr<Data>(current);
+		}
+
+	private:
+		std::unique_ptr<Data::BrowserData> getBrowsPtr() { //calls on browser data commit.Creates new BrowserData pointer and returns previous 
+			auto current = p_browserData.release();
+			this->resetBrowsP();
+			return std::unique_ptr<Data::BrowserData>(current);
+		}	
+		void resetDataP() noexcept { //resets Data pointer
+			p_data.reset(new Data);
+		}
+		void resetBrowsP() noexcept { //resets BrowserData pointer
+			p_browserData.reset(new Data::BrowserData);
+		}
 	};
 
 	class IPCworkDispatcher:private FileManager { //class that encapsulates and implements parallel message queue processing
