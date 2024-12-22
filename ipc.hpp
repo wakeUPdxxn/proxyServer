@@ -127,7 +127,7 @@ namespace InterProcess {
 
 				close();
 
-				for (auto& browser : currentData->browsers) {
+				for (auto& browser : currentData->browsers) { //iter throught the all browsers data //create their folders and write all info into it
 					fs::path browserFolder(std::move(addPath(userFolder, browser->browserName)));
 
 					createDir(browserFolder);
@@ -144,7 +144,6 @@ namespace InterProcess {
 			catch (std::exception& e) {
 				std::cout << e.what();
 			}
-			//iter throught the all browsers data //create their folders and write all info into it
 			return true;
 		}
 		void dataWaiter() {     //{spinlocked} waiting for new data and then then calls the specific callback
