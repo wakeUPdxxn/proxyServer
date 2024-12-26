@@ -5,6 +5,7 @@ An tcp server to receive data and notify another process
 # Requirements
 boost::asio <br />
 boost::json <br />
+boost::system <br />
 
 # Build
 - mkdir build && cd build
