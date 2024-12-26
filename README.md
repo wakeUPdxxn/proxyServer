@@ -1,8 +1,16 @@
 # proxyServer
 
-An tcp server for receiving data and transfering state to another process
+An tcp server to receive data and notify another process
+
+# Requirements
+boost::asio <br />
+boost::json <br />
+
+# Build
+- mkdir build && cd build
+- cmake .. -G -Ninja ..
+- ninja
 
 # ToDo
-
-- 1)Func for writing data from a message to an file;
-- 2)Interprocess file lock and interprocess messaging mechanism for calling read func on another process;
+- [x] 1)Func for writing data from a message to an file;
+- [x] 2)Interprocess messaging mechanism to notify another process
