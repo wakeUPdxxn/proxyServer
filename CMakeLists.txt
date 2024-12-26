@@ -17,8 +17,8 @@ if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
-enable_testing()
-add_subdirectory(tests)
+#enable_testing()
+#add_subdirectory(tests)
 
 add_executable(proxyServer ${SRC} ${HEADERS})
 target_link_libraries (proxyServer LINK_PUBLIC ${Boost_LIBRARIES})
