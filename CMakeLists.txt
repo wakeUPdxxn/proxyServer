@@ -9,6 +9,10 @@ IF (NOT MSVC)
     set(CMAKE_C_COMPILER gcc)
 ENDIF()
 
+if (UNIX)
+   set(THREADS_PREFER_PTHREAD_FLAG ON)
+ENDIF()
+
 set(Boost_USE_STATIC_LIBS OFF) 
 set(Boost_USE_MULTITHREADED ON)  
 set(Boost_USE_STATIC_RUNTIME OFF) 
@@ -23,13 +27,15 @@ find_package(Threads REQUIRED)
 #add_subdirectory(tests)
 
 add_executable(proxyServer ${SRC} ${HEADERS})
-
-IF (NOT DEFINED CMAKE_USE_WIN32_THREADS_INIT)
-   target_link_libraries(proxyServer LINK_PUBLIC Threads)
-ENDIF()
+target_link_libraries (proxyServer LINK_PUBLIC Threads::Threads)
 
 IF (Boost_FOUND)
     INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
-    target_link_libraries (proxyServer LINK_PUBLIC ${Boost_LIBRARIES})
+    target_link_libraries (proxyServer LINK_PUBLIC ${Boost_LIBRARIES}) 
 ENDIF()
+
+include(GNUInstallDirs)
+install(TARGETS proxyServer
+          DESTINATION ${CMAKE_INSTALL_BINDIR}/proxyServer
+)
 
