@@ -90,7 +90,7 @@ namespace ServerSide {
 
 				json::object targetInfo = jObj.at("targetInfo").as_object();  //gets all target's info
 				dataBuilder.buildTargetInfo(targetInfo.at("os").as_string().c_str(),        //builds all target's info
-											targetInfo.at("resolution").as_string().c_str(),
+											targetInfo.at("hostname").as_string().c_str(),
 											targetInfo.at("resolution").as_string().c_str());
 			
 				for (auto& browser : jObj.at("Browsers").as_array()) { //iterations by browsers and their data's
