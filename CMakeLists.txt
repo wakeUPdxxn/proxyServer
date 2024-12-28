@@ -36,6 +36,6 @@ ENDIF()
 
 include(GNUInstallDirs)
 install(TARGETS proxyServer
-          DESTINATION ${CMAKE_INSTALL_BINDIR}/proxyServer
+          DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
