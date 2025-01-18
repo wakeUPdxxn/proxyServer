@@ -15,3 +15,4 @@ An tcp server to receive data and notify another process
 # ToDo
 - [x] Func for writing data from a message to an file;
 - [x] Interprocess messaging mechanism to notify another process
+- [ ] Logging mechanism
