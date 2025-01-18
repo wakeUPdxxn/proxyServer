@@ -8,9 +8,9 @@ boost::json <br />
 boost::system <br />
 
 # Build
-- mkdir build && cd build
-- cmake .. -G -Ninja ..
-- ninja
+```mkdir build && cd build```</br>
+```cmake .. -G -Ninja ..```</br>
+``` ninja ```
 
 # ToDo
 - [x] 1)Func for writing data from a message to an file;
